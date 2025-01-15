@@ -1,76 +1,54 @@
 #include <iostream>
-#include <fstream>
 #include <filesystem>
-#include <chrono>
-#include <thread>
-#include <unordered_map>
-#include <string>
-
-namespace fs = std::filesystem;
-
-// 配置类
-class Config {
-public:
-	Config(const std::string& filename) : filename_(filename) {
-		loadConfig();
-	}
-
-	void loadConfig() {
-		std::ifstream file(filename_);
-		if (!file.is_open()) {
-			std::cerr << "无法打开配置文件: " << filename_ << std::endl;
-			return;
-		}
-
-		std::string line;
-		while (std::getline(file, line)) {
-			size_t pos = line.find('=');
-			if (pos != std::string::npos) {
-				std::string key = line.substr(0, pos);
-				std::string value = line.substr(pos + 1);
-				config_[key] = value;
-			}
-		}
-		file.close();
-		last_modified_ = fs::last_write_time(filename_);
-	}
-
-	std::string get(const std::string& key) const {
-		auto it = config_.find(key);
-		if (it != config_.end()) {
-			return it->second;
-		}
-		return "";
-	}
-
-	bool checkAndReload() {
-		auto current_modified = fs::last_write_time(filename_);
-		if (current_modified != last_modified_) {
-			loadConfig();
-			last_modified_ = current_modified;
-			return true;
-		}
-		return false;
-	}
-
-private:
-	std::string filename_;
-	std::unordered_map<std::string, std::string> config_;
-	fs::file_time_type last_modified_;
-};
+#include <functional>
+#include"FSWatcher.hpp"
 
 int main() {
-	Config config("config.txt");
+	CFSEasyWatcher watcher;
 
+	// 注册回调函数
+	//std::string watch_id = "example_watch";
+	FS::path file_path = "config.txt";
+	EventCallback cb = []() {
+		//这里放读取配置的逻辑
+		std::cout << "文件被修改了！" << std::endl;
+	};
+
+	if (watcher.add(file_path, cb)) {
+		std::cout << "监控注册成功！" << std::endl;
+	}
+	else {
+		std::cout << "监控注册失败！" << std::endl;
+	}
+
+	// 模拟文件修改
+	//std::this_thread::sleep_for(std::chrono::seconds(5));
+
+	// 运行监控循环
 	while (true) {
-		if (config.checkAndReload()) {
-			std::cout << "配置文件已更新：" << std::endl;
-			std::cout << "interval: " << config.get("interval") << std::endl;
-			std::cout << "enabled: " << config.get("enabled") << std::endl;
-		}
-
-		std::this_thread::sleep_for(std::chrono::seconds(5)); // 每5秒检查一次
+		watcher.loop_once();
+		//std::this_thread::sleep_for(std::chrono::seconds(1));
 	}
 
 	return 0;
 }
+//
+//int main() {
+//	FS::path file_path = "config.txt";
+//	std::error_code ec;
+//	auto absolute_path = FS::absolute(file_path, ec);
+//	if (ec) {
+//		std::cerr << "Error converting to absolute path: " << ec.message() << std::endl;
+//		return 1;
+//	}
+//
+//	auto canonical_path = FS::weakly_canonical(absolute_path, ec);
+//	if (ec) {
+//		std::cerr << "Error canonicalizing path: " << ec.message() << std::endl;
+//		return 1;
+//	}
+//
+//	std::cout << "原始路径: " << file_path << std::endl;
+//	std::cout << "绝对路径: " << absolute_path << std::endl;
+//	std::cout << "规范化路径: " << canonical_path << std::endl;
+//}
